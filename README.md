@@ -53,12 +53,6 @@ config urls.py:
 
 ## 3.Warm up
 Let's get familar with Official account objects.
-### WxClient
-WxClient use to check if the request is valid.
-
-	from wechat.official import WxClient
-	cli = WxClient('your official account token')  # init with you official token
-	status, content = cli.is_valid_params(params)  # params is a dict, which represent the http querty params.
 
 ### WxRequest
 A WxRequest instance represent an incoming wechat message. One message is piece of xml. WxRequest map elements of xml to it's own attributes, so you can access the message directly. for more information, see [this link](http://mp.weixin.qq.com/wiki/index.php?title=%E6%B6%88%E6%81%AF%E6%8E%A5%E5%8F%A3%E6%8C%87%E5%8D%97#.E6.B6.88.E6.81.AF.E6.8E.A8.E9.80.81).
@@ -88,34 +82,54 @@ A WxResponse instance represent and outgoing wechat message. One message is piec
 							Description="It is not a joke",
 							Url="http://jeffkit.info",
 							PicUrl="http://jeffkit.info/avatar.jpg")], wxreq).as_xml()
+							
+### WxApplication
+You should process the WxRequest and return WxResponse in WxApplication. Every time you make a wechat official account application, you should write a subclass of WxApplication, overwrite the following method, every method start with 'on_' should return a WxResponse instance.
 
-## 4.Build the Robot
+#### on_text(self, text)
+Call when recive a text type message. 
+#### on_image(self, image)
+Call when recive a image type message. 
+#### on_link(self, link)
+call when recive a link type message. 
+#### on_location(self, location)
+Call when recive a location type message.
+#### on_subscribe(self, sub)
+Call when recive a subscribe event.
+#### on_unsubscribe(self, unsub)
+Call when recive an unsubscribe event.
+#### on_click(self, click)
+Call when recive an custome event.
+
+Here is the echo robt's sample code:
+
+	from wechat.official import WxApplication, WxTextResponse
+	
+	class EchoApp(WxApplication):
+		def on_text(self, text):
+			return WxTextResponse(text.Content, text)
+		def on_image(self, image):
+			return WxTextResponse(image.PicUrl, image)
+
+
+We only overwrite to 'on_' style method in the sample. if recive an message which type is neither text nor image, the echo robot will reply an UNSUPPORT_TXT message. you can define you own UNSUPPORT_TXT in you WxApplication subclass. 
+
+## 4.Run the Application
 
 The robot's code is simple. edit the echo/views.py:
 
 	from django.http import HttpResponse
-	from wechat.official import WxRequest, WxTextResponse
-	from wechat.official import WxClient
-
+	
+	class EchoApp(WxApplication) ………
+	……………………
 
 	def wechat(request):
-    	cli = WxClient("your official account token")
-	    ret = cli.is_valid_params(request.GET)  # validate the request
-	    if not ret:
-    	    return HttpResponse('invalid request')
-	    if request.method == 'GET':
-	        return HttpResponse(ret[1])  # for interface validation
-	    else:
-    	    req = WxRequest(request.body)
-        	if req.MsgType == 'text':
-            	return HttpResponse(WxTextResponse(req.Content, req).as_xml())
-	        elif req.MsgType == 'event' and req.Event == 'subscribe':
-	            return HttpResponse(WxTextResponse('welcome to echo bot!',
-    	                                           req).as_xml())
-        	else:
-            	return HttpResponse(WxTextResponse('support text only',
-                	                               req).as_xml())
+		app = EchoApp()
+		result = app.process(request.GET, request.body, token='your token')
+		return HttpResponse(result)
+		
 
+It's easy!
 ## 5.deploy 
 That's all. deploy you web application, and have fun!
 
