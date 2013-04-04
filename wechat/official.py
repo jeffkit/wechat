@@ -67,9 +67,6 @@ class WxResponse(object):
         xml.appendChild(kv2element('FuncFlag', self.FuncFlag, doc))
         return doc.toxml()
 
-    def content_nodes(self, doc):
-        raise 'not implement'
-
 
 WxMusic = collections.namedtuple('WxMusic',
                                  'Title Description MusicUrl HQMusicUrl')
@@ -121,10 +118,11 @@ class WxNewsResponse(WxResponse):
         return count, articles
 
 
-class WxClient(object):
+class WxApplication(object):
 
-    def __init__(self, token):
-        self.token = token
+    UNSUPPORT_TXT = u'暂不支持此类型消息'
+    WELCOME_TXT = u'你好！感谢您的关注！'
+    SECRET_TOKEN = None
 
     def is_valid_params(self, params):
         timestamp = params.get('timestamp', '')
@@ -138,3 +136,69 @@ class WxClient(object):
             return True, echostr
         else:
             return None
+
+    def process(self, auth_params, xml=None, token=None):
+        self.token = token if token else self.SECRET_TOKEN
+        assert self.SECRET_TOKEN is not None
+
+        ret = self.is_valid_params(auth_params)
+
+        if not ret:
+            return 'invalid request'
+        if not xml:
+            # 微信开发者设置的调用测试
+            return ret[1]
+
+        req = WxRequest(xml)
+        self.wxreq = req
+        func = self.handler_map().get(req.MsgType, None)
+        if not func:
+            return WxTextResponse(self.UNSUPPORT_TXT, req)
+        self.pre_process()
+        rsp = func(req)
+        self.post_process(rsp)
+        return rsp.as_xml()
+
+    def on_text(self, text):
+        return WxTextResponse(self.UNSUPPORT_TXT, text)
+
+    def on_link(self, link):
+        return WxTextResponse(self.UNSUPPORT_TXT, link)
+
+    def on_image(self, image):
+        return WxTextResponse(self.UNSUPPORT_TXT, image)
+
+    def on_location(self, loc):
+        return WxTextResponse(self.UNSUPPORT_TXT, loc)
+
+    def on_event(self, event):
+        if event.Event == 'subscribe':
+            return self.on_subscribe(event)
+        elif event.Event == 'unsubscribe':
+            return self.on_unsubscribe(event)
+        else:
+            return self.on_click(event)
+
+    def on_subscribe(self, sub):
+        return WxTextResponse(self.WELCOME_TXT, sub)
+
+    def on_unsubscribe(self, unsub):
+        return WxTextResponse(self.UNSUPPORT_TXT, unsub)
+
+    def on_click(self, click):
+        return WxTextResponse(self.UNSUPPORT_TXT, click)
+
+    def handler_map(self):
+        return {
+            'text': self.on_text,
+            'link': self.on_link,
+            'image': self.on_image,
+            'location': self.on_location,
+            'event': self.on_event,
+        }
+
+    def pre_process(self):
+        pass
+
+    def post_process(self, rsp):
+        pass
