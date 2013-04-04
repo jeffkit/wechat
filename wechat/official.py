@@ -139,7 +139,7 @@ class WxApplication(object):
 
     def process(self, auth_params, xml=None, token=None):
         self.token = token if token else self.SECRET_TOKEN
-        assert self.SECRET_TOKEN is not None
+        assert self.token is not None
 
         ret = self.is_valid_params(auth_params)
 
