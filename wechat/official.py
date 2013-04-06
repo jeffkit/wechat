@@ -30,7 +30,9 @@ def fields2elements(tupleObj, enclose_tag=None, doc=None):
 
 class WxRequest(object):
 
-    def __init__(self, xml):
+    def __init__(self, xml=None):
+        if not xml:
+            return
         doc = minidom.parseString(xml)
         params = [ele for ele in doc.childNodes[0].childNodes
                   if isinstance(ele, minidom.Element)]
