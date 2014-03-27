@@ -269,7 +269,7 @@ class WxApi(object):
         headers = {'Content-type': 'application/json', 'Accept': 'text/json'}
         path = self.API_PREFIX + path + '?access_token=' + self.access_token
         if ctype == 'json':
-            data = json.dumps(data)
+            data = json.dumps(data, ensure_ascii=False).encode('utf-8')
         rsp = requests.post(path, data=data, headers=headers)
         return self._process_response(rsp)
 
@@ -297,7 +297,7 @@ class WxApi(object):
         else:
             return None, APIError(rsp.status_code, 'http error')
 
-    def send_message(self, msg_type, to_user, content):
+    def send_message(self,to_user, msg_type, content):
         func = {'text': self.send_text,
                 'image': self.send_image,
                 'voice': self.send_voice,
@@ -306,6 +306,7 @@ class WxApi(object):
                 'news': self.send_news}.get(msg_type, None)
         if func:
             return func(to_user, content)
+        return None, None
 
     def send_text(self, to_user, content):
         return self._post('message/custom/send',
