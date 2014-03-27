@@ -305,7 +305,7 @@ class WxApi(object):
                 'music': self.send_music,
                 'news': self.send_news}.get(msg_type, None)
         if func:
-            func(to_user, content)
+            return func(to_user, content)
 
     def send_text(self, to_user, content):
         return self._post('message/custom/send',
