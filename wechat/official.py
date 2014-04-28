@@ -193,6 +193,8 @@ class WxApplication(object):
         return WxTextResponse(self.UNSUPPORT_TXT, click)
 
     def handler_map(self):
+        if getattr(self, 'handlers'):
+            return self.handlers
         return {
             'text': self.on_text,
             'link': self.on_link,
@@ -297,7 +299,7 @@ class WxApi(object):
         else:
             return None, APIError(rsp.status_code, 'http error')
 
-    def send_message(self,to_user, msg_type, content):
+    def send_message(self, to_user, msg_type, content):
         func = {'text': self.send_text,
                 'image': self.send_image,
                 'voice': self.send_voice,
