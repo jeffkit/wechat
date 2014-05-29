@@ -1,4 +1,4 @@
-#encoding=utf-8
+# encoding=utf-8
 from xml.dom import minidom
 import collections
 import time
@@ -172,6 +172,12 @@ class WxApplication(object):
     def on_image(self, image):
         return WxTextResponse(self.UNSUPPORT_TXT, image)
 
+    def on_voice(self, voice):
+        return WxTextResponse(self.UNSUPPORT_TXT, voice)
+
+    def on_video(self, video):
+        return WxTextResponse(self.UNSUPPORT_TXT, video)
+
     def on_location(self, loc):
         return WxTextResponse(self.UNSUPPORT_TXT, loc)
 
@@ -199,6 +205,8 @@ class WxApplication(object):
             'text': self.on_text,
             'link': self.on_link,
             'image': self.on_image,
+            'voice': self.on_voice,
+            'video': self.on_video,
             'location': self.on_location,
             'event': self.on_event,
         }
