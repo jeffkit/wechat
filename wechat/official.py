@@ -199,7 +199,7 @@ class WxApplication(object):
         return WxTextResponse(self.UNSUPPORT_TXT, click)
 
     def handler_map(self):
-        if getattr(self, 'handlers'):
+        if getattr(self, 'handlers', None):
             return self.handlers
         return {
             'text': self.on_text,
