@@ -181,13 +181,21 @@ class WxApplication(object):
     def on_location(self, loc):
         return WxTextResponse(self.UNSUPPORT_TXT, loc)
 
+    def event_map(self):
+        if getattr(self, 'event_handlers', None):
+            return self.event_handlers
+        return {
+            'subscribe': self.on_subscribe,
+            'unsubscribe': self.on_unsubscribe,
+            'SCAN': self.on_scan,
+            'LOCATION': self.on_location_update,
+            'CLICK': self.on_click,
+            'VIEW': self.on_view
+        }
+
     def on_event(self, event):
-        if event.Event == 'subscribe':
-            return self.on_subscribe(event)
-        elif event.Event == 'unsubscribe':
-            return self.on_unsubscribe(event)
-        else:
-            return self.on_click(event)
+        func = self.event_map().get(event.Event, None)
+        return func(event)
 
     def on_subscribe(self, sub):
         return WxTextResponse(self.WELCOME_TXT, sub)
@@ -197,6 +205,15 @@ class WxApplication(object):
 
     def on_click(self, click):
         return WxTextResponse(self.UNSUPPORT_TXT, click)
+
+    def on_scan(self, scan):
+        return WxTextResponse(self.UNSUPPORT_TXT, scan)
+
+    def on_location_update(self, location):
+        return WxTextResponse(self.UNSUPPORT_TXT, location)
+
+    def on_view(self, view):
+        return WxTextResponse(self.UNSUPPORT_TXT, view)
 
     def handler_map(self):
         if getattr(self, 'handlers', None):
