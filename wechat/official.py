@@ -266,10 +266,14 @@ class WxApi(object):
                 return None
         return self._access_token
 
+    def flush_token(self):
+        self._access_token = None
+
     def get_access_token(self):
         params = {'grant_type': 'client_credential', 'appid': self.appid,
                   'secret': self.appsecret}
-        return self._get('token', params)
+        rsp = requests.get(self.API_PREFIX + 'token', params)
+        return self._process_response(rsp)
 
     def _process_response(self, rsp):
         if rsp.status_code != 200:
@@ -285,9 +289,9 @@ class WxApi(object):
     def _get(self, path, params=None):
         if not params:
             params = {}
-        if self._access_token:
-            params['access_token'] = self._access_token
-        rsp = requests.get(self.API_PREFIX + path, params=params, verify=False)
+        params['access_token'] = self.access_token
+        rsp = requests.get(self.API_PREFIX + path, params=params,
+                           verify=False)
         return self._process_response(rsp)
 
     def _post(self, path, data, ctype='json'):
