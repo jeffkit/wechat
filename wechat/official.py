@@ -272,7 +272,7 @@ class WxApi(object):
     def get_access_token(self):
         params = {'grant_type': 'client_credential', 'appid': self.appid,
                   'secret': self.appsecret}
-        rsp = requests.get(self.API_PREFIX + 'token', params)
+        rsp = requests.get(self.API_PREFIX + 'token', params=params)
         return self._process_response(rsp)
 
     def _process_response(self, rsp):
