@@ -257,12 +257,10 @@ class WxApi(object):
         if (not self._access_token) or (
                 self._access_token and time.time() > self.expires_in):
             self._access_token = None
-            print 'get access token again'
             token, err = self.get_access_token()
             if not err:
                 self._access_token = token['access_token']
                 self.expires_in = time.time() + token['expires_in']
-                print 'expires in %d' % self.expires_in
                 return self._access_token
             else:
                 return None
@@ -289,7 +287,7 @@ class WxApi(object):
             params = {}
         if self._access_token:
             params['access_token'] = self._access_token
-        rsp = requests.get(self.API_PREFIX + path, params=params)
+        rsp = requests.get(self.API_PREFIX + path, params=params, verify=False)
         return self._process_response(rsp)
 
     def _post(self, path, data, ctype='json'):
@@ -297,7 +295,7 @@ class WxApi(object):
         path = self.API_PREFIX + path + '?access_token=' + self.access_token
         if ctype == 'json':
             data = json.dumps(data, ensure_ascii=False).encode('utf-8')
-        rsp = requests.post(path, data=data, headers=headers)
+        rsp = requests.post(path, data=data, headers=headers, verify=False)
         return self._process_response(rsp)
 
     def user_info(self, user_id, lang='zh_CN'):
@@ -310,12 +308,13 @@ class WxApi(object):
         # TODO, 对各种类型的文件作合法性校验
         path = self.API_PREFIX + 'media/upload?access_token=' \
             + self._access_token + '&type=' + mtype
-        rsp = requests.post(path, files={'media': open(filepath, 'rb')})
+        rsp = requests.post(path, files={'media': open(filepath, 'rb')},
+                            verify=False)
         return self._process_response(rsp)
 
     def download_media(self,  media_id, to_path):
         rsp = requests.get(self.API_PREFIX + 'media/get',
-                           {'media_ia': media_id})
+                           {'media_ia': media_id}, verify=False)
         if rsp.status_code == 200:
             save_file = open(to_path, 'wb')
             save_file.write(rsp.content)
