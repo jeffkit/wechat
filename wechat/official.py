@@ -246,30 +246,32 @@ class WxApi(object):
 
     API_PREFIX = 'https://api.weixin.qq.com/cgi-bin/'
 
-    def __init__(self, appid, appsecret):
+    def __init__(self, appid, appsecret, api_entry=None):
         self.appid = appid
         self.appsecret = appsecret
         self._access_token = None
-        self.expires_in = time.time()
+        self.api_entry = api_entry or self.API_PREFIX
 
     @property
     def access_token(self):
-        if (not self._access_token) or (
-                self._access_token and time.time() > self.expires_in):
-            self._access_token = None
+        if not self._access_token:
             token, err = self.get_access_token()
             if not err:
                 self._access_token = token['access_token']
-                self.expires_in = time.time() + token['expires_in']
                 return self._access_token
             else:
                 return None
         return self._access_token
 
+    def set_access_token(self, token):
+        self._access_token = token
+
     def get_access_token(self):
         params = {'grant_type': 'client_credential', 'appid': self.appid,
                   'secret': self.appsecret}
-        return self._get('token', params)
+        rsp = requests.get(self.api_entry + 'token', params=params,
+                           verify=False)
+        return self._process_response(rsp)
 
     def _process_response(self, rsp):
         if rsp.status_code != 200:
@@ -285,14 +287,14 @@ class WxApi(object):
     def _get(self, path, params=None):
         if not params:
             params = {}
-        if self._access_token:
-            params['access_token'] = self._access_token
-        rsp = requests.get(self.API_PREFIX + path, params=params, verify=False)
+        params['access_token'] = self.access_token
+        rsp = requests.get(self.api_entry + path, params=params,
+                           verify=False)
         return self._process_response(rsp)
 
     def _post(self, path, data, ctype='json'):
         headers = {'Content-type': 'application/json', 'Accept': 'text/json'}
-        path = self.API_PREFIX + path + '?access_token=' + self.access_token
+        path = self.api_entry + path + '?access_token=' + self.access_token
         if ctype == 'json':
             data = json.dumps(data, ensure_ascii=False).encode('utf-8')
         rsp = requests.post(path, data=data, headers=headers, verify=False)
@@ -305,16 +307,17 @@ class WxApi(object):
         return self._get('user/get', {'next_openid': next_id})
 
     def upload_media(self, mtype, filepath):
-        # TODO, 对各种类型的文件作合法性校验
-        path = self.API_PREFIX + 'media/upload?access_token=' \
+        path = self.api_entry + 'media/upload?access_token=' \
             + self._access_token + '&type=' + mtype
         rsp = requests.post(path, files={'media': open(filepath, 'rb')},
                             verify=False)
         return self._process_response(rsp)
 
     def download_media(self,  media_id, to_path):
-        rsp = requests.get(self.API_PREFIX + 'media/get',
-                           {'media_ia': media_id}, verify=False)
+        rsp = requests.get(self.api_entry + 'media/get',
+                           params={'media_id': media_id,
+                                   'access_token': self._access_token},
+                           verify=False)
         if rsp.status_code == 200:
             save_file = open(to_path, 'wb')
             save_file.write(rsp.content)
