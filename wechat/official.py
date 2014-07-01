@@ -307,7 +307,6 @@ class WxApi(object):
         return self._get('user/get', {'next_openid': next_id})
 
     def upload_media(self, mtype, filepath):
-        # TODO, 对各种类型的文件作合法性校验
         path = self.api_entry + 'media/upload?access_token=' \
             + self._access_token + '&type=' + mtype
         rsp = requests.post(path, files={'media': open(filepath, 'rb')},
@@ -316,7 +315,9 @@ class WxApi(object):
 
     def download_media(self,  media_id, to_path):
         rsp = requests.get(self.api_entry + 'media/get',
-                           {'media_ia': media_id}, verify=False)
+                           params={'media_id': media_id,
+                                   'access_token': self._access_token},
+                           verify=False)
         if rsp.status_code == 200:
             save_file = open(to_path, 'wb')
             save_file.write(rsp.content)
