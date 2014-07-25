@@ -5,6 +5,9 @@ import time
 from hashlib import sha1
 import requests
 import simplejson as json
+import tempfile
+import shutil
+import os
 
 
 def kv2element(key, value, doc):
@@ -306,11 +309,22 @@ class WxApi(object):
     def followers(self, next_id=''):
         return self._get('user/get', {'next_openid': next_id})
 
-    def upload_media(self, mtype, filepath):
+    def upload_media(self, mtype, file_path=None, file_content=None):
         path = self.api_entry + 'media/upload?access_token=' \
             + self._access_token + '&type=' + mtype
-        rsp = requests.post(path, files={'media': open(filepath, 'rb')},
+        if file_path:
+            tmp_path = tempfile.mkstemp(suffix='.jpg')[1]
+            shutil.copy(file_path, tmp_path)
+        elif file_content:
+            tmp_path = tempfile.mkstemp(suffix='.jpg')[1]
+            f = open(tmp_path, 'wb')
+            f.write(file_content)
+            f.close()
+        media = open(tmp_path, 'rb')
+        rsp = requests.post(path, files={'media': media},
                             verify=False)
+        media.close()
+        os.remove(tmp_path)
         return self._process_response(rsp)
 
     def download_media(self,  media_id, to_path):
@@ -353,6 +367,22 @@ class WxApi(object):
                            'voice': {'media_id': media_id}})
 
     def send_music(self, to_user, music):
+        if not music.get('thumb_media_id'):
+            rsp, err = None, None
+            if music.get('thumb_media_content'):
+                rsp, err = self.upload_media(
+                    'image',
+                    file_content=music.get('thumb_media_content'))
+            elif music.get('thumb_media_url'):
+                imgrsp = requests.get(music.get('thumb_media_url'))
+                rsp, err = self.upload_media(
+                    'image',
+                    file_content=imgrsp.content)
+            else:
+                return None, APIError(41006, 'missing media_id')
+            if err:
+                return None, err
+            music['thumb_media_id'] = rsp['media_id']
         return self._post('message/custom/send',
                           {'touser': to_user, 'msgtype': 'music',
                            'music': music})
