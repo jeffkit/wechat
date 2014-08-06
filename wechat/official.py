@@ -56,6 +56,7 @@ class WxResponse(object):
         self.FuncFlag = 0
         self.ToUserName = request.FromUserName
         self.FromUserName = request.ToUserName
+        self.Extra = {}
 
     def as_xml(self):
         doc = minidom.Document()
@@ -71,6 +72,9 @@ class WxResponse(object):
                 xml.appendChild(content)
         else:
             xml.appendChild(contents)
+        if self.Extra:
+            for key, value in self.Extra.iteritems():
+                xml.appendChild(kv2element(key, value, doc))
         xml.appendChild(kv2element('FuncFlag', self.FuncFlag, doc))
         return doc.toxml()
 
