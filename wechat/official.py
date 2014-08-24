@@ -360,38 +360,55 @@ class WxApi(object):
                           {'touser': to_user, 'msgtype': 'text',
                            'text': {'content': content}})
 
-    def send_image(self, to_user, media_id):
+    def send_image(self, to_user, media_id=None, media_url=None):
+        mid = self._get_media_id(
+            {'media_id': media_id, 'media_url': media_url},
+            'media', 'image')
         return self._post('message/custom/send',
                           {'touser': to_user, 'msgtype': 'image',
-                           'image': {'media_id': media_id}})
+                           'image': {'media_id': mid}})
 
-    def send_voice(self, to_user, media_id):
+    def send_voice(self, to_user, media_id=None, media_url=None):
+        mid = self._get_media_id(
+            {'media_id': media_id, 'media_url': media_url},
+            'media', 'voice')
         return self._post('message/custom/send',
                           {'touser': to_user, 'msgtype': 'voice',
-                           'voice': {'media_id': media_id}})
+                           'voice': {'media_id': mid}})
 
     def send_music(self, to_user, music):
+        music['thumb_media_id'] = self._get_media_id(music,
+                                                     'thumb_media',
+                                                     'image')
         if not music.get('thumb_media_id'):
-            rsp, err = None, None
-            if music.get('thumb_media_content'):
-                rsp, err = self.upload_media(
-                    'image',
-                    file_content=music.get('thumb_media_content'))
-            elif music.get('thumb_media_url'):
-                imgrsp = requests.get(music.get('thumb_media_url'))
-                rsp, err = self.upload_media(
-                    'image',
-                    file_content=imgrsp.content)
-            else:
-                return None, APIError(41006, 'missing media_id')
-            if err:
-                return None, err
-            music['thumb_media_id'] = rsp['media_id']
+            return None, APIError(41006, 'missing media_id')
         return self._post('message/custom/send',
                           {'touser': to_user, 'msgtype': 'music',
                            'music': music})
 
+    def _get_media_id(self, obj, resource, content_type):
+        if not obj.get(resource + '_id'):
+            rsp, err = None, None
+            if obj.get(resource + '_content'):
+                rsp, err = self.upload_media(
+                    content_type,
+                    file_content=obj.get(resource + '_content'))
+            elif obj.get(resource + '_url'):
+                rs = requests.get(obj.get(resource + '_url'))
+                rsp, err = self.upload_media(
+                    content_type,
+                    file_content=rs.content)
+            else:
+                return None
+            return rsp['media_id']
+        return obj.get(resource + '_id')
+
     def send_video(self, to_user, video):
+        video['media_id'] = self._get_media_id(video, 'media', 'video')
+        video['thumb_media_id'] = self._get_media_id(video,
+                                                     'thumb_media', 'image')
+        if 'media_id' not in video or 'thumb_media_id' not in video:
+            return None, APIError(41006, 'missing media_id')
         return self._post('message/custom/send',
                           {'touser': to_user, 'msgtype': 'video',
                            'video': video})
