@@ -420,9 +420,11 @@ class WxApi(object):
                            'video': video})
 
     def send_news(self, to_user, news):
+        if isinstance(news, dict):
+            news = [news]
         return self._post('message/custom/send',
                           {'touser': to_user, 'msgtype': 'news',
-                           'news': news})
+                           'news': {'articles': news}})
 
     def create_group(self, name):
         return self._post('groups/create',
