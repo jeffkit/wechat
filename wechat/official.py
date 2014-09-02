@@ -361,6 +361,9 @@ class WxApi(object):
                            'text': {'content': content}})
 
     def send_image(self, to_user, media_id=None, media_url=None):
+        if media_id and media_id.startswith('http'):
+            media_url = media_id
+            media_id = None
         mid = self._get_media_id(
             {'media_id': media_id, 'media_url': media_url},
             'media', 'image')
@@ -369,6 +372,9 @@ class WxApi(object):
                            'image': {'media_id': mid}})
 
     def send_voice(self, to_user, media_id=None, media_url=None):
+        if media_id and media_id.startswith('http'):
+            media_url = media_id
+            media_id = None
         mid = self._get_media_id(
             {'media_id': media_id, 'media_url': media_url},
             'media', 'voice')
@@ -414,9 +420,11 @@ class WxApi(object):
                            'video': video})
 
     def send_news(self, to_user, news):
+        if isinstance(news, dict):
+            news = [news]
         return self._post('message/custom/send',
                           {'touser': to_user, 'msgtype': 'news',
-                           'news': news})
+                           'news': {'articles': news}})
 
     def create_group(self, name):
         return self._post('groups/create',
