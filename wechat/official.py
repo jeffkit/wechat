@@ -300,7 +300,7 @@ class WxApi(object):
         return self._process_response(rsp)
 
     def _post(self, path, data, ctype='json'):
-        headers = {'Content-type': 'application/json', 'Accept': 'text/json'}
+        headers = {'Content-type': 'application/json'}
         path = self.api_entry + path + '?access_token=' + self.access_token
         if ctype == 'json':
             data = json.dumps(data, ensure_ascii=False).encode('utf-8')
