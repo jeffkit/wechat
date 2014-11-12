@@ -300,7 +300,7 @@ class WxApi(object):
         return self._process_response(rsp)
 
     def _post(self, path, data, ctype='json'):
-        headers = {'Content-type': 'application/json', 'Accept': 'text/json'}
+        headers = {'Content-type': 'application/json'}
         path = self.api_entry + path + '?access_token=' + self.access_token
         if ctype == 'json':
             data = json.dumps(data, ensure_ascii=False).encode('utf-8')
@@ -316,12 +316,15 @@ class WxApi(object):
     def upload_media(self, mtype, file_path=None, file_content=None):
         path = self.api_entry + 'media/upload?access_token=' \
             + self._access_token + '&type=' + mtype
+        suffix = {'image': '.jpg', 'voice': '.mp3',
+                  'video': 'mp4', 'thumb': 'jpg'}[mtype]
         if file_path:
-            tmp_path = tempfile.mkstemp(suffix='.jpg')[1]
+            fd, tmp_path = tempfile.mkstemp(suffix=suffix)
             shutil.copy(file_path, tmp_path)
+            os.close(fd)
         elif file_content:
-            tmp_path = tempfile.mkstemp(suffix='.jpg')[1]
-            f = open(tmp_path, 'wb')
+            fd, tmp_path = tempfile.mkstemp(suffix=suffix)
+            f = os.fdopen(fd, 'wb')
             f.write(file_content)
             f.close()
         media = open(tmp_path, 'rb')
@@ -399,11 +402,15 @@ class WxApi(object):
                 rsp, err = self.upload_media(
                     content_type,
                     file_content=obj.get(resource + '_content'))
+                if err:
+                    return None
             elif obj.get(resource + '_url'):
                 rs = requests.get(obj.get(resource + '_url'))
                 rsp, err = self.upload_media(
                     content_type,
                     file_content=rs.content)
+                if err:
+                    return None
             else:
                 return None
             return rsp['media_id']
