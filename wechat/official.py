@@ -319,11 +319,12 @@ class WxApi(object):
         suffix = {'image': '.jpg', 'voice': '.mp3',
                   'video': 'mp4', 'thumb': 'jpg'}[mtype]
         if file_path:
-            tmp_path = tempfile.mkstemp(suffix=suffix)[1]
+            fd, tmp_path = tempfile.mkstemp(suffix=suffix)
             shutil.copy(file_path, tmp_path)
+            os.close(fd)
         elif file_content:
-            tmp_path = tempfile.mkstemp(suffix=suffix)[1]
-            f = open(tmp_path, 'wb')
+            fd, tmp_path = tempfile.mkstemp(suffix=suffix)
+            f = os.fdopen(fd, 'wb')
             f.write(file_content)
             f.close()
         media = open(tmp_path, 'rb')
