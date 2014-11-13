@@ -8,6 +8,7 @@ import simplejson as json
 import tempfile
 import shutil
 import os
+from .crypt import WXBizMsgCrypt
 
 
 def kv2element(key, value, doc):
@@ -134,6 +135,8 @@ class WxApplication(object):
     UNSUPPORT_TXT = u'暂不支持此类型消息'
     WELCOME_TXT = u'你好！感谢您的关注！'
     SECRET_TOKEN = None
+    APP_ID = None
+    ENCODING_AES_KEY = None
 
     def is_valid_params(self, params):
         timestamp = params.get('timestamp', '')
@@ -148,17 +151,32 @@ class WxApplication(object):
         else:
             return None
 
-    def process(self, auth_params, xml=None, token=None):
+    def process(self, params, xml=None, token=None):
         self.token = token if token else self.SECRET_TOKEN
         assert self.token is not None
 
-        ret = self.is_valid_params(auth_params)
+        ret = self.is_valid_params(params)
 
         if not ret:
             return 'invalid request'
         if not xml:
             # 微信开发者设置的调用测试
             return ret[1]
+
+        # 解密消息
+        encrypt_type = params.get('encrypt_type', '')
+        if encrypt_type != '' and encrypt_type != 'raw':
+            msg_signature = params.get('msg_signature', '')
+            timestamp = params.get('timestamp', '')
+            nonce = params.get('nonce', '')
+            if encrypt_type == 'aes':
+                cpt = WXBizMsgCrypt(self.SECRET_TOKEN,
+                                    self.ENCODING_AES_KEY, self.APP_ID)
+                err, xml = cpt.DecryptMsg(xml, msg_signature, timestamp, nonce)
+                if err:
+                    return 'decrypt message error, code : %s' % err
+            else:
+                return 'unsupport encrypty type %s' % encrypt_type
 
         req = WxRequest(xml)
         self.wxreq = req
@@ -168,7 +186,17 @@ class WxApplication(object):
         self.pre_process()
         rsp = func(req)
         self.post_process(rsp)
-        return rsp.as_xml()
+        result = rsp.as_xml()
+
+        # 加密消息
+        if encrypt_type != '' and encrypt_type != 'raw':
+            if encrypt_type == 'aes':
+                err, result = cpt.EncryptMsg(result, nonce)
+                if err:
+                    return 'encrypt message error , code %s' % err
+            else:
+                return 'unsupport encrypty type %s' % encrypt_type
+        return result
 
     def on_text(self, text):
         return WxTextResponse(self.UNSUPPORT_TXT, text)
