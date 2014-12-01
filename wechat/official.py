@@ -41,8 +41,10 @@ class WxApplication(object):
         else:
             return None
 
-    def process(self, params, xml=None, token=None):
+    def process(self, params, xml=None, token=None, app_id=None, aes_key=None):
         self.token = token if token else self.SECRET_TOKEN
+        self.app_id = app_id if app_id else self.APP_ID
+        self.aes_key = aes_key if aes_key else self.ENCODING_AES_KEY
         assert self.token is not None
 
         ret = self.is_valid_params(params)
@@ -60,8 +62,8 @@ class WxApplication(object):
             timestamp = params.get('timestamp', '')
             nonce = params.get('nonce', '')
             if encrypt_type == 'aes':
-                cpt = WXBizMsgCrypt(self.SECRET_TOKEN,
-                                    self.ENCODING_AES_KEY, self.APP_ID)
+                cpt = WXBizMsgCrypt(self.token,
+                                    self.aes_key, self.app_id)
                 err, xml = cpt.DecryptMsg(xml, msg_signature, timestamp, nonce)
                 if err:
                     return 'decrypt message error, code : %s' % err
@@ -184,7 +186,7 @@ class WxApplication(object):
         pass
 
 
-class WxApi(object):
+class WxBaseApi(object):
 
     API_PREFIX = 'https://api.weixin.qq.com/cgi-bin/'
 
@@ -208,13 +210,6 @@ class WxApi(object):
     def set_access_token(self, token):
         self._access_token = token
 
-    def get_access_token(self):
-        params = {'grant_type': 'client_credential', 'appid': self.appid,
-                  'secret': self.appsecret}
-        rsp = requests.get(self.api_entry + 'token', params=params,
-                           verify=False)
-        return self._process_response(rsp)
-
     def _process_response(self, rsp):
         if rsp.status_code != 200:
             return None, APIError(rsp.status_code, 'http error')
@@ -236,23 +231,25 @@ class WxApi(object):
 
     def _post(self, path, data, ctype='json'):
         headers = {'Content-type': 'application/json'}
-        path = self.api_entry + path + '?access_token=' + self.access_token
+        path = self.api_entry + path
+        if '?' in path:
+            path += '&access_token=' + self.access_token
+        else:
+            path += '?access_token=' + self.access_token
         if ctype == 'json':
             data = json.dumps(data, ensure_ascii=False).encode('utf-8')
         rsp = requests.post(path, data=data, headers=headers, verify=False)
         return self._process_response(rsp)
 
-    def user_info(self, user_id, lang='zh_CN'):
-        return self._get('user/info', {'openid': user_id, 'lang': lang})
-
-    def followers(self, next_id=''):
-        return self._get('user/get', {'next_openid': next_id})
-
-    def upload_media(self, mtype, file_path=None, file_content=None):
-        path = self.api_entry + 'media/upload?access_token=' \
+    def upload_media(self, mtype, file_path=None, file_content=None,
+                     url='media/upload', suffies=None):
+        path = self.api_entry + url + '?access_token=' \
             + self._access_token + '&type=' + mtype
-        suffix = {'image': '.jpg', 'voice': '.mp3',
-                  'video': 'mp4', 'thumb': 'jpg'}[mtype]
+        suffies = suffies or {'image': '.jpg', 'voice': '.mp3',
+                              'video': 'mp4', 'thumb': 'jpg'}
+        suffix = None
+        if mtype in suffies:
+            suffix = suffies[mtype]
         if file_path:
             fd, tmp_path = tempfile.mkstemp(suffix=suffix)
             shutil.copy(file_path, tmp_path)
@@ -269,8 +266,8 @@ class WxApi(object):
         os.remove(tmp_path)
         return self._process_response(rsp)
 
-    def download_media(self,  media_id, to_path):
-        rsp = requests.get(self.api_entry + 'media/get',
+    def download_media(self,  media_id, to_path, url='media/get'):
+        rsp = requests.get(self.api_entry + url,
                            params={'media_id': media_id,
                                    'access_token': self._access_token},
                            verify=False)
@@ -281,6 +278,45 @@ class WxApi(object):
             return {'errcode': 0}, None
         else:
             return None, APIError(rsp.status_code, 'http error')
+
+    def _get_media_id(self, obj, resource, content_type):
+        if not obj.get(resource + '_id'):
+            rsp, err = None, None
+            if obj.get(resource + '_content'):
+                rsp, err = self.upload_media(
+                    content_type,
+                    file_content=obj.get(resource + '_content'))
+                if err:
+                    return None
+            elif obj.get(resource + '_url'):
+                rs = requests.get(obj.get(resource + '_url'))
+                rsp, err = self.upload_media(
+                    content_type,
+                    file_content=rs.content)
+                if err:
+                    return None
+            else:
+                return None
+            return rsp['media_id']
+        return obj.get(resource + '_id')
+
+
+class WxApi(WxBaseApi):
+
+    def get_access_token(self, url=None, **kwargs):
+        params = {'grant_type': 'client_credential', 'appid': self.appid,
+                  'secret': self.appsecret}
+        if kwargs:
+            params.update(kwargs)
+        rsp = requests.get(url or self.api_entry + 'token', params=params,
+                           verify=False)
+        return self._process_response(rsp)
+
+    def user_info(self, user_id, lang='zh_CN'):
+        return self._get('user/info', {'openid': user_id, 'lang': lang})
+
+    def followers(self, next_id=''):
+        return self._get('user/get', {'next_openid': next_id})
 
     def send_message(self, to_user, msg_type, content):
         func = {'text': self.send_text,
@@ -329,27 +365,6 @@ class WxApi(object):
         return self._post('message/custom/send',
                           {'touser': to_user, 'msgtype': 'music',
                            'music': music})
-
-    def _get_media_id(self, obj, resource, content_type):
-        if not obj.get(resource + '_id'):
-            rsp, err = None, None
-            if obj.get(resource + '_content'):
-                rsp, err = self.upload_media(
-                    content_type,
-                    file_content=obj.get(resource + '_content'))
-                if err:
-                    return None
-            elif obj.get(resource + '_url'):
-                rs = requests.get(obj.get(resource + '_url'))
-                rsp, err = self.upload_media(
-                    content_type,
-                    file_content=rs.content)
-                if err:
-                    return None
-            else:
-                return None
-            return rsp['media_id']
-        return obj.get(resource + '_id')
 
     def send_video(self, to_user, video):
         video['media_id'] = self._get_media_id(video, 'media', 'video')
