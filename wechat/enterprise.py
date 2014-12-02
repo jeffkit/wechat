@@ -108,11 +108,11 @@ class WxApi(WxBaseApi):
         return self._get('cgi-bin/tag/list')
 
     def add_tag(self, tagname):
-        return self._post('cgi-bin/tag/create', params={'tagname': tagname})
+        return self._post('cgi-bin/tag/create', {'tagname': tagname})
 
     def update_tag(self, tagid, tagname):
         return self._post('cgi-bin/tag/update',
-                          params={'tagid': tagid, 'tagname': tagname})
+                          {'tagid': tagid, 'tagname': tagname})
 
     def delete_tag(self, tagid):
         return self._get('cgi-bin/tag/delete', params={'tagid': tagid})
@@ -122,11 +122,11 @@ class WxApi(WxBaseApi):
 
     def add_tag_user(self, tagid, userlist):
         return self._post('cgi-bin/tag/addtagusers',
-                          params={'tagid': tagid, 'userlist': userlist})
+                          {'tagid': tagid, 'userlist': userlist})
 
     def remove_tag_user(self, tagid, userlist):
         return self._post('cgi-bin/tag/deltagusers',
-                          params={'tagid': tagid, 'userlist': userlist})
+                          {'tagid': tagid, 'userlist': userlist})
 
     def department_users(self, department_id, fetch_child=0, status=0):
         return self._get('cgi-bin/user/simplelist',
