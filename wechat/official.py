@@ -244,7 +244,7 @@ class WxBaseApi(object):
     def upload_media(self, mtype, file_path=None, file_content=None,
                      url='media/upload', suffies=None):
         path = self.api_entry + url + '?access_token=' \
-            + self._access_token + '&type=' + mtype
+            + self.access_token + '&type=' + mtype
         suffies = suffies or {'image': '.jpg', 'voice': '.mp3',
                               'video': 'mp4', 'thumb': 'jpg'}
         suffix = None
@@ -269,7 +269,7 @@ class WxBaseApi(object):
     def download_media(self,  media_id, to_path, url='media/get'):
         rsp = requests.get(self.api_entry + url,
                            params={'media_id': media_id,
-                                   'access_token': self._access_token},
+                                   'access_token': self.access_token},
                            verify=False)
         if rsp.status_code == 200:
             save_file = open(to_path, 'wb')

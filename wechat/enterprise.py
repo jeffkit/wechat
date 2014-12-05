@@ -1,6 +1,7 @@
 #encoding=utf-8
 
 import requests
+import time
 from .models import WxRequest, WxResponse
 from .models import WxArticle, WxImage, WxVoice, WxVideo, WxLink
 from .models import WxTextResponse, WxImageResponse, WxVoiceResponse,\
@@ -76,18 +77,35 @@ def format_list(data):
         return data
 
 def simplify_send_parmas(params):
-    print 'before\n %s' % params
     keys = params.keys()
     for key in keys:
         if not params[key]:
             del params[key]
-    print 'after\n %s' % params
     return params
 
 
 class WxApi(WxBaseApi):
 
     API_PREFIX = 'https://qyapi.weixin.qq.com/'
+
+    def __init__(self, appid, appsecret, api_entry=None):
+        super(WxApi, self).__init__(appid, appsecret, api_entry)
+        self.expires_in = time.time()
+
+    @property
+    def access_token(self):
+        if self._access_token and time.time() >= self.expires_in:
+            self._access_token = None
+        
+        if not self._access_token:
+            token, err = self.get_access_token()
+            if not err:
+                self._access_token = token['access_token']
+                self.expires_in = time.time() + token['expires_in']
+                return self._access_token
+            else:
+                return None
+        return self._access_token
 
     def get_access_token(self, url=None, **kwargs):
         params = {'corpid': self.appid, 'corpsecret': self.appsecret}
