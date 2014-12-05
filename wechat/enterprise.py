@@ -75,6 +75,15 @@ def format_list(data):
     else:
         return data
 
+def simplify_send_parmas(params):
+    print 'before\n %s' % params
+    keys = params.keys()
+    for key in keys:
+        if not params[key]:
+            del params[key]
+    print 'after\n %s' % params
+    return params
+
 
 class WxApi(WxBaseApi):
 
@@ -188,7 +197,7 @@ class WxApi(WxBaseApi):
             media_id, to_path, 'cgi-bin/media/get')
 
     def send_message(self, msg_type, content, agentid, safe="0", touser=None,
-                     toparty=None, totag=None):
+                     toparty=None, totag=None, **kwargs):
         func = {'text': self.send_text,
                 'image': self.send_image,
                 'voice': self.send_voice,
@@ -198,21 +207,22 @@ class WxApi(WxBaseApi):
                 'mpnews': self.send_mpnews}.get(msg_type, None)
         if func:
             return func(content, agentid, safe=safe, touser=touser,
-                        toparty=toparty, totag=totag)
+                        toparty=toparty, totag=totag, **kwargs)
         else:
             return None, None
 
     def send_text(self, content, agentid, safe="0", touser=None,
                   toparty=None, totag=None):
-        return self._post('cgi-bin/message/send',
-                          {'touser': format_list(touser),
-                           'toparty': format_list(toparty),
-                           'totag': format_list(totag),
-                           'msgtype': 'text',
-                           'agentid': agentid,
-                           'safe': safe,
-                           'text': {'content': content}
-                           })
+        return self._post(
+            'cgi-bin/message/send',
+            simplify_send_parmas({'touser': format_list(touser),
+                                  'toparty': format_list(toparty),
+                                  'totag': format_list(totag),
+                                  'msgtype': 'text',
+                                  'agentid': agentid,
+                                  'safe': safe,
+                                  'text': {'content': content}
+                                  }))
 
     def send_simple_media(self, mtype, media_id, agentid, safe="0",
                           touser=None, toparty=None, totag=None,
@@ -223,15 +233,16 @@ class WxApi(WxBaseApi):
         mid = self._get_media_id(
             {'media_id': media_id, 'media_url': media_url},
             'media', mtype)
-        return self._post('cgi-bin/message/send',
-                          {'touser': format_list(touser),
-                           'toparty': format_list(toparty),
-                           'totag': format_list(totag),
-                           'msgtype': mtype,
-                           'agentid': agentid,
-                           'safe': safe,
-                           mtype: {'media_id': mid}
-                           })
+        return self._post(
+            'cgi-bin/message/send',
+            simplify_send_parmas({'touser': format_list(touser),
+                                  'toparty': format_list(toparty),
+                                  'totag': format_list(totag),
+                                  'msgtype': mtype,
+                                  'agentid': agentid,
+                                  'safe': safe,
+                                  mtype: {'media_id': mid}
+                                  }))
 
     def send_image(self, media_id, agentid, safe="0", touser=None,
                    toparty=None, totag=None, media_url=None):
@@ -253,40 +264,43 @@ class WxApi(WxBaseApi):
         video['media_id'] = self._get_media_id(video, 'media', 'video')
         if 'media_url' in video:
             del video['media_url']
-        return self._post('cgi-bin/message/send',
-                          {'touser': format_list(touser),
-                           'toparty': format_list(toparty),
-                           'totag': format_list(totag),
-                           'msgtype': 'video',
-                           'agentid': agentid,
-                           'safe': safe,
-                           'video': video})
+        return self._post(
+            'cgi-bin/message/send',
+            simplify_send_parmas({'touser': format_list(touser),
+                                  'toparty': format_list(toparty),
+                                  'totag': format_list(totag),
+                                  'msgtype': 'video',
+                                  'agentid': agentid,
+                                  'safe': safe,
+                                  'video': video}))
 
     def send_news(self, news, agentid, safe="0", touser=None,
                   toparty=None, totag=None, media_url=None):
         if isinstance(news, dict):
             news = [news]
-        return self._post('cgi-bin/message/send',
-                          {'touser': format_list(touser),
-                           'toparty': format_list(toparty),
-                           'totag': format_list(totag),
-                           'msgtype': 'news',
-                           'agentid': agentid,
-                           'safe': safe,
-                           'news': {'articles': news}})
+        return self._post(
+            'cgi-bin/message/send',
+            simplify_send_parmas({'touser': format_list(touser),
+                                  'toparty': format_list(toparty),
+                                  'totag': format_list(totag),
+                                  'msgtype': 'news',
+                                  'agentid': agentid,
+                                  'safe': safe,
+                                  'news': {'articles': news}}))
 
     def send_mpnews(self, mpnews, agentid, safe="0", touser=None,
                     toparty=None, totag=None, media_url=None):
         if isinstance(mpnews, dict):
             news = [mpnews]
-        return self._post('cgi-bin/message/send',
-                          {'touser': format_list(touser),
-                           'toparty': format_list(toparty),
-                           'totag': format_list(totag),
-                           'msgtype': 'mpnews',
-                           'agentid': agentid,
-                           'safe': safe,
-                           'mpnews': {'articles': news}})
+        return self._post(
+            'cgi-bin/message/send',
+            simplify_send_parmas({'touser': format_list(touser),
+                                  'toparty': format_list(toparty),
+                                  'totag': format_list(totag),
+                                  'msgtype': 'mpnews',
+                                  'agentid': agentid,
+                                  'safe': safe,
+                                  'mpnews': {'articles': news}}))
 
     def create_menu(self, menus, agentid):
         return self._post('cgi-bin/menu/create?agentid=%s' % agentid,
