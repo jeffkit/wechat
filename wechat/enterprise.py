@@ -338,7 +338,7 @@ class WxApi(WxBaseApi):
         # 变态的微信实现，参数的顺序也有讲究。。艹！这个实现太恶心，太恶心！
         url = 'https://open.weixin.qq.com/connect/oauth2/authorize?'
         rd_uri = urllib.urlencode({'redirect_uri': redirect_uri})
-        url += 'api=%s&' % appid
+        url += 'appid=%s&' % appid
         url += rd_uri
         url += '&response_type=' + response_type
         url += '&scope=' + scope
