@@ -2,6 +2,7 @@
 
 import requests
 import time
+import urllib
 from .models import WxRequest, WxResponse
 from .models import WxArticle, WxImage, WxVoice, WxVideo, WxLink
 from .models import WxTextResponse, WxImageResponse, WxVoiceResponse,\
@@ -76,6 +77,7 @@ def format_list(data):
     else:
         return data
 
+
 def simplify_send_parmas(params):
     keys = params.keys()
     for key in keys:
@@ -96,7 +98,7 @@ class WxApi(WxBaseApi):
     def access_token(self):
         if self._access_token and time.time() >= self.expires_in:
             self._access_token = None
-        
+
         if not self._access_token:
             token, err = self.get_access_token()
             if not err:
@@ -329,3 +331,18 @@ class WxApi(WxBaseApi):
 
     def delete_menu(self, agentid):
         return self._get('cgi-bin/menu/delete', {'agentid': agentid})
+
+    # OAuth2
+    def authorize_url(self, appid, redirect_uri, response_type='code',
+                      scope='snsapi_base', state=None):
+        url = 'https://open.weixin.qq.com/connect/oauth2/authorize'
+        params = {'appid': appid, 'redirect_uri': redirect_uri,
+                  'response_type': response_type, 'scope': scope}
+        if state:
+            params['state'] = state
+        query = urllib.urlencode(params)
+        return url + '?' + query + '#bwechat_redirect'
+
+    def get_user_info(self, agentid, code):
+        return self._get('cgi-bin/user/getuserinfo',
+                         {'agentid': agentid, 'code': code})
