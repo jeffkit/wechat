@@ -335,13 +335,16 @@ class WxApi(WxBaseApi):
     # OAuth2
     def authorize_url(self, appid, redirect_uri, response_type='code',
                       scope='snsapi_base', state=None):
-        url = 'https://open.weixin.qq.com/connect/oauth2/authorize'
-        params = {'appid': appid, 'redirect_uri': redirect_uri,
-                  'response_type': response_type, 'scope': scope}
+        # 变态的微信实现，参数的顺序也有讲究。。艹！这个实现太恶心，太恶心！
+        url = 'https://open.weixin.qq.com/connect/oauth2/authorize?'
+        rd_uri = urllib.urlencode({'redirect_uri': redirect_uri})
+        url += 'api=%s&' % appid
+        url += rd_uri
+        url += '&response_type=' + response_type
+        url += '&scope=' + scope
         if state:
-            params['state'] = state
-        query = urllib.urlencode(params)
-        return url + '?' + query + '#wechat_redirect'
+            url += '&state=' + state
+        return url + '#wechat_redirect'
 
     def get_user_info(self, agentid, code):
         return self._get('cgi-bin/user/getuserinfo',
