@@ -341,7 +341,7 @@ class WxApi(WxBaseApi):
         if state:
             params['state'] = state
         query = urllib.urlencode(params)
-        return url + '?' + query + '#bwechat_redirect'
+        return url + '?' + query + '#wechat_redirect'
 
     def get_user_info(self, agentid, code):
         return self._get('cgi-bin/user/getuserinfo',
