@@ -18,7 +18,7 @@ WXBizMsgCrypt_ValidateSignature_Error = -40001
 WXBizMsgCrypt_ParseXml_Error = -40002
 WXBizMsgCrypt_ComputeSignature_Error = -40003
 WXBizMsgCrypt_IllegalAesKey = -40004
-WXBizMsgCrypt_ValidateAppidOrCropid_Error = -40005
+WXBizMsgCrypt_ValidateAppidOrCorpid_Error = -40005
 WXBizMsgCrypt_EncryptAES_Error = -40006
 WXBizMsgCrypt_DecryptAES_Error = -40007
 WXBizMsgCrypt_IllegalBuffer = -40008
@@ -186,7 +186,7 @@ class Prpcrypt(object):
         except Exception:
             return WXBizMsgCrypt_IllegalBuffer, None
         if from_appid != appid:
-            return WXBizMsgCrypt_ValidateAppidOrCropid_Error, None
+            return WXBizMsgCrypt_ValidateAppidOrCorpid_Error, None
         return 0, xml_content
 
     def get_random_str(self):

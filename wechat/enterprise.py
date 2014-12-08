@@ -22,17 +22,17 @@ class WxApplication(BaseApplication):
     UNSUPPORT_TXT = u'暂不支持此类型消息'
     WELCOME_TXT = u'你好！感谢您的关注！'
     SECRET_TOKEN = None
-    CROP_ID = None
+    CORP_ID = None
     ENCODING_AES_KEY = None
 
-    def process(self, params, xml=None, token=None, crop_id=None,
+    def process(self, params, xml=None, token=None, corp_id=None,
                 aes_key=None):
         self.token = token or self.SECRET_TOKEN
-        self.crop_id = crop_id or self.CROP_ID
+        self.corp_id = corp_id or self.CORP_ID
         self.aes_key = aes_key or self.ENCODING_AES_KEY
 
         assert self.token is not None
-        assert self.crop_id is not None
+        assert self.corp_id is not None
         assert self.aes_key is not None
 
         timestamp = params.get('timestamp', '')
@@ -40,7 +40,7 @@ class WxApplication(BaseApplication):
         msg_signature = params.get('msg_signature', '')
         echostr = params.get('echostr', '')
 
-        cpt = WXBizMsgCrypt(self.token, self.aes_key, self.crop_id)
+        cpt = WXBizMsgCrypt(self.token, self.aes_key, self.corp_id)
 
         err, echo = cpt.VerifyURL(msg_signature, timestamp, nonce, echostr)
 
