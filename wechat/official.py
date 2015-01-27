@@ -1,132 +1,23 @@
 # encoding=utf-8
-from xml.dom import minidom
-import collections
-import time
+
 from hashlib import sha1
 import requests
-import simplejson as json
+import json
 import tempfile
 import shutil
 import os
+from .crypt import WXBizMsgCrypt
 
+from .models import WxRequest, WxResponse
+from .models import WxMusic, WxArticle, WxImage, WxVoice, WxVideo, WxLink
+from .models import WxTextResponse, WxImageResponse, WxVoiceResponse,\
+    WxVideoResponse, WxMusicResponse, WxNewsResponse, APIError, WxEmptyResponse
 
-def kv2element(key, value, doc):
-    ele = doc.createElement(key)
-    if isinstance(value, str) or isinstance(value, unicode):
-        data = doc.createCDATASection(value)
-        ele.appendChild(data)
-    else:
-        text = doc.createTextNode(str(value))
-        ele.appendChild(text)
-    return ele
-
-
-def fields2elements(tupleObj, enclose_tag=None, doc=None):
-    if enclose_tag:
-        xml = doc.createElement(enclose_tag)
-        for key in tupleObj._fields:
-            ele = kv2element(key, getattr(tupleObj, key), doc)
-            xml.appendChild(ele)
-        return xml
-    else:
-        return [kv2element(key, getattr(tupleObj, key), doc)
-                for key in tupleObj._fields]
-
-
-class WxRequest(object):
-
-    def __init__(self, xml=None):
-        if not xml:
-            return
-        doc = minidom.parseString(xml)
-        params = [ele for ele in doc.childNodes[0].childNodes
-                  if isinstance(ele, minidom.Element)]
-        for param in params:
-            if param.childNodes:
-                text = param.childNodes[0]
-                self.__dict__.update({param.tagName: text.data})
-            else:
-                self.__dict__.update({param.tagName: ''})
-
-
-class WxResponse(object):
-
-    def __init__(self, request):
-        self.CreateTime = long(time.time())
-        self.FuncFlag = 0
-        self.ToUserName = request.FromUserName
-        self.FromUserName = request.ToUserName
-        self.Extra = {}
-
-    def as_xml(self):
-        doc = minidom.Document()
-        xml = doc.createElement('xml')
-        doc.appendChild(xml)
-        xml.appendChild(kv2element('ToUserName', self.ToUserName, doc))
-        xml.appendChild(kv2element('FromUserName', self.FromUserName, doc))
-        xml.appendChild(kv2element('CreateTime', self.CreateTime, doc))
-        xml.appendChild(kv2element('MsgType', self.MsgType, doc))
-        contents = self.content_nodes(doc)
-        if isinstance(contents, list) or isinstance(contents, tuple):
-            for content in contents:
-                xml.appendChild(content)
-        else:
-            xml.appendChild(contents)
-        if self.Extra:
-            for key, value in self.Extra.iteritems():
-                xml.appendChild(kv2element(key, value, doc))
-        xml.appendChild(kv2element('FuncFlag', self.FuncFlag, doc))
-        return doc.toxml()
-
-
-WxMusic = collections.namedtuple('WxMusic',
-                                 'Title Description MusicUrl HQMusicUrl')
-WxArticle = collections.namedtuple('WxArticle',
-                                   'Title Description PicUrl Url')
-WxLink = collections.namedtuple('WxLink', 'Title Description Url')
-
-
-class WxTextResponse(WxResponse):
-
-    MsgType = 'text'
-
-    def __init__(self, text, request):
-        super(WxTextResponse, self).__init__(request)
-        self.text = text
-
-    def content_nodes(self, doc):
-        return kv2element('Content', self.text, doc)
-
-
-class WxMusicResponse(WxResponse):
-
-    MsgType = 'music'
-
-    def __init__(self, music, request):
-        super(WxMusicResponse, self).__init__(request)
-        self.music = music
-
-    def content_nodes(self, doc):
-        return fields2elements(self.music, 'Music', doc)
-
-
-class WxNewsResponse(WxResponse):
-
-    MsgType = 'news'
-
-    def __init__(self, articles, request):
-        super(WxNewsResponse, self).__init__(request)
-        if isinstance(articles, list) or isinstance(articles, tuple):
-            self.articles = articles
-        else:
-            self.articles = [articles]
-
-    def content_nodes(self, doc):
-        count = kv2element('ArticleCount', len(self.articles), doc)
-        articles = doc.createElement('Articles')
-        for article in self.articles:
-            articles.appendChild(fields2elements(article, 'item', doc))
-        return count, articles
+__all__ = ['WxRequest', 'WxResponse', 'WxMusic', 'WxArticle', 'WxImage',
+           'WxVoice', 'WxVideo', 'WxLink', 'WxTextResponse',
+           'WxImageResponse', 'WxVoiceResponse', 'WxVideoResponse',
+           'WxMusicResponse', 'WxNewsResponse', 'WxApplication',
+           'WxEmptyResponse', 'WxApi', 'APIError']
 
 
 class WxApplication(object):
@@ -134,6 +25,8 @@ class WxApplication(object):
     UNSUPPORT_TXT = u'暂不支持此类型消息'
     WELCOME_TXT = u'你好！感谢您的关注！'
     SECRET_TOKEN = None
+    APP_ID = None
+    ENCODING_AES_KEY = None
 
     def is_valid_params(self, params):
         timestamp = params.get('timestamp', '')
@@ -148,17 +41,34 @@ class WxApplication(object):
         else:
             return None
 
-    def process(self, auth_params, xml=None, token=None):
+    def process(self, params, xml=None, token=None, app_id=None, aes_key=None):
         self.token = token if token else self.SECRET_TOKEN
+        self.app_id = app_id if app_id else self.APP_ID
+        self.aes_key = aes_key if aes_key else self.ENCODING_AES_KEY
         assert self.token is not None
 
-        ret = self.is_valid_params(auth_params)
+        ret = self.is_valid_params(params)
 
         if not ret:
             return 'invalid request'
         if not xml:
             # 微信开发者设置的调用测试
             return ret[1]
+
+        # 解密消息
+        encrypt_type = params.get('encrypt_type', '')
+        if encrypt_type != '' and encrypt_type != 'raw':
+            msg_signature = params.get('msg_signature', '')
+            timestamp = params.get('timestamp', '')
+            nonce = params.get('nonce', '')
+            if encrypt_type == 'aes':
+                cpt = WXBizMsgCrypt(self.token,
+                                    self.aes_key, self.app_id)
+                err, xml = cpt.DecryptMsg(xml, msg_signature, timestamp, nonce)
+                if err:
+                    return 'decrypt message error, code : %s' % err
+            else:
+                return 'unsupport encrypty type %s' % encrypt_type
 
         req = WxRequest(xml)
         self.wxreq = req
@@ -168,7 +78,17 @@ class WxApplication(object):
         self.pre_process()
         rsp = func(req)
         self.post_process(rsp)
-        return rsp.as_xml()
+        result = rsp.as_xml()
+
+        # 加密消息
+        if encrypt_type != '' and encrypt_type != 'raw':
+            if encrypt_type == 'aes':
+                err, result = cpt.EncryptMsg(result, nonce)
+                if err:
+                    return 'encrypt message error , code %s' % err
+            else:
+                return 'unsupport encrypty type %s' % encrypt_type
+        return result
 
     def on_text(self, text):
         return WxTextResponse(self.UNSUPPORT_TXT, text)
@@ -197,7 +117,13 @@ class WxApplication(object):
             'SCAN': self.on_scan,
             'LOCATION': self.on_location_update,
             'CLICK': self.on_click,
-            'VIEW': self.on_view
+            'VIEW': self.on_view,
+            'scancode_push': self.on_scancode_push,
+            'scancode_waitmsg': self.on_scancode_waitmsg,
+            'pic_sysphoto': self.on_pic_sysphoto,
+            'pic_photo_or_album': self.on_pic_photo_or_album,
+            'pic_weixin': self.on_pic_weixin,
+            'location_select': self.on_location_select,
         }
 
     def on_event(self, event):
@@ -208,19 +134,37 @@ class WxApplication(object):
         return WxTextResponse(self.WELCOME_TXT, sub)
 
     def on_unsubscribe(self, unsub):
-        return WxTextResponse(self.UNSUPPORT_TXT, unsub)
+        return WxEmptyResponse()
 
     def on_click(self, click):
-        return WxTextResponse(self.UNSUPPORT_TXT, click)
+        return WxEmptyResponse()
 
     def on_scan(self, scan):
-        return WxTextResponse(self.UNSUPPORT_TXT, scan)
+        return WxEmptyResponse()
 
     def on_location_update(self, location):
-        return WxTextResponse(self.UNSUPPORT_TXT, location)
+        return WxEmptyResponse()
 
     def on_view(self, view):
-        return WxTextResponse(self.UNSUPPORT_TXT, view)
+        return WxEmptyResponse()
+
+    def on_scancode_push(self, event):
+        return WxEmptyResponse()
+
+    def on_scancode_waitmsg(self, event):
+        return WxEmptyResponse()
+
+    def on_pic_sysphoto(self, event):
+        return WxEmptyResponse()
+
+    def on_pic_photo_or_album(self, event):
+        return WxEmptyResponse()
+
+    def on_pic_weixin(self, event):
+        return WxEmptyResponse()
+
+    def on_location_select(self, event):
+        return WxEmptyResponse()
 
     def handler_map(self):
         if getattr(self, 'handlers', None):
@@ -242,14 +186,7 @@ class WxApplication(object):
         pass
 
 
-class APIError(object):
-
-    def __init__(self, code, msg):
-        self.code = code
-        self.message = msg
-
-
-class WxApi(object):
+class WxBaseApi(object):
 
     API_PREFIX = 'https://api.weixin.qq.com/cgi-bin/'
 
@@ -273,13 +210,6 @@ class WxApi(object):
     def set_access_token(self, token):
         self._access_token = token
 
-    def get_access_token(self):
-        params = {'grant_type': 'client_credential', 'appid': self.appid,
-                  'secret': self.appsecret}
-        rsp = requests.get(self.api_entry + 'token', params=params,
-                           verify=False)
-        return self._process_response(rsp)
-
     def _process_response(self, rsp):
         if rsp.status_code != 200:
             return None, APIError(rsp.status_code, 'http error')
@@ -301,23 +231,25 @@ class WxApi(object):
 
     def _post(self, path, data, ctype='json'):
         headers = {'Content-type': 'application/json'}
-        path = self.api_entry + path + '?access_token=' + self.access_token
+        path = self.api_entry + path
+        if '?' in path:
+            path += '&access_token=' + self.access_token
+        else:
+            path += '?access_token=' + self.access_token
         if ctype == 'json':
             data = json.dumps(data, ensure_ascii=False).encode('utf-8')
         rsp = requests.post(path, data=data, headers=headers, verify=False)
         return self._process_response(rsp)
 
-    def user_info(self, user_id, lang='zh_CN'):
-        return self._get('user/info', {'openid': user_id, 'lang': lang})
-
-    def followers(self, next_id=''):
-        return self._get('user/get', {'next_openid': next_id})
-
-    def upload_media(self, mtype, file_path=None, file_content=None):
-        path = self.api_entry + 'media/upload?access_token=' \
-            + self._access_token + '&type=' + mtype
-        suffix = {'image': '.jpg', 'voice': '.mp3',
-                  'video': 'mp4', 'thumb': 'jpg'}[mtype]
+    def upload_media(self, mtype, file_path=None, file_content=None,
+                     url='media/upload', suffies=None):
+        path = self.api_entry + url + '?access_token=' \
+            + self.access_token + '&type=' + mtype
+        suffies = suffies or {'image': '.jpg', 'voice': '.mp3',
+                              'video': 'mp4', 'thumb': 'jpg'}
+        suffix = None
+        if mtype in suffies:
+            suffix = suffies[mtype]
         if file_path:
             fd, tmp_path = tempfile.mkstemp(suffix=suffix)
             shutil.copy(file_path, tmp_path)
@@ -334,10 +266,10 @@ class WxApi(object):
         os.remove(tmp_path)
         return self._process_response(rsp)
 
-    def download_media(self,  media_id, to_path):
-        rsp = requests.get(self.api_entry + 'media/get',
+    def download_media(self,  media_id, to_path, url='media/get'):
+        rsp = requests.get(self.api_entry + url,
                            params={'media_id': media_id,
-                                   'access_token': self._access_token},
+                                   'access_token': self.access_token},
                            verify=False)
         if rsp.status_code == 200:
             save_file = open(to_path, 'wb')
@@ -346,6 +278,45 @@ class WxApi(object):
             return {'errcode': 0}, None
         else:
             return None, APIError(rsp.status_code, 'http error')
+
+    def _get_media_id(self, obj, resource, content_type):
+        if not obj.get(resource + '_id'):
+            rsp, err = None, None
+            if obj.get(resource + '_content'):
+                rsp, err = self.upload_media(
+                    content_type,
+                    file_content=obj.get(resource + '_content'))
+                if err:
+                    return None
+            elif obj.get(resource + '_url'):
+                rs = requests.get(obj.get(resource + '_url'))
+                rsp, err = self.upload_media(
+                    content_type,
+                    file_content=rs.content)
+                if err:
+                    return None
+            else:
+                return None
+            return rsp['media_id']
+        return obj.get(resource + '_id')
+
+
+class WxApi(WxBaseApi):
+
+    def get_access_token(self, url=None, **kwargs):
+        params = {'grant_type': 'client_credential', 'appid': self.appid,
+                  'secret': self.appsecret}
+        if kwargs:
+            params.update(kwargs)
+        rsp = requests.get(url or self.api_entry + 'token', params=params,
+                           verify=False)
+        return self._process_response(rsp)
+
+    def user_info(self, user_id, lang='zh_CN'):
+        return self._get('user/info', {'openid': user_id, 'lang': lang})
+
+    def followers(self, next_id=''):
+        return self._get('user/get', {'next_openid': next_id})
 
     def send_message(self, to_user, msg_type, content):
         func = {'text': self.send_text,
@@ -395,27 +366,6 @@ class WxApi(object):
                           {'touser': to_user, 'msgtype': 'music',
                            'music': music})
 
-    def _get_media_id(self, obj, resource, content_type):
-        if not obj.get(resource + '_id'):
-            rsp, err = None, None
-            if obj.get(resource + '_content'):
-                rsp, err = self.upload_media(
-                    content_type,
-                    file_content=obj.get(resource + '_content'))
-                if err:
-                    return None
-            elif obj.get(resource + '_url'):
-                rs = requests.get(obj.get(resource + '_url'))
-                rsp, err = self.upload_media(
-                    content_type,
-                    file_content=rs.content)
-                if err:
-                    return None
-            else:
-                return None
-            return rsp['media_id']
-        return obj.get(resource + '_id')
-
     def send_video(self, to_user, video):
         video['media_id'] = self._get_media_id(video, 'media', 'video')
         video['thumb_media_id'] = self._get_media_id(video,
@@ -459,3 +409,12 @@ class WxApi(object):
 
     def delete_menu(self):
         return self._get('menu/delete')
+
+    def customservice_records(self, starttime, endtime, openid=None,
+                              pagesize=100, pageindex=1):
+        return self._get('customservice/getrecord',
+                         {'starttime': starttime,
+                          'endtime': endtime,
+                          'openid': openid,
+                          'pagesize': pagesize,
+                          'pageindex': pageindex})
