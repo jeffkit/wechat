@@ -24,7 +24,47 @@
 
 WxApplication内部会实现请求的合法性校验以及消息的分发等功能，还对上行消息对行了结构化，开发者把精力放到业务逻辑的编写即可。
 
-下面先看看一个WxApplication的示例代码：
+WxApplication类核心方法：
+
+### WxApplication.process(params, xml, token=None, app_id=None, aes_key=None)
+
+WxApplication的process函数，接受以下参数：
+
+- params, url参数字典，需要解析自微信回调的url的querystring。格式如：{'nonce': 1232, 'signature': 'xsdfsdfsd'}
+- xml, 微信回调时post的xml内容。
+- token, 公众号的上行token，可选，允许在子类配置。
+- app_id, 公众号应用id，可选，允许在子类配置。
+- aes_key, 公众号加密secret，可选，允许在子类配置。
+
+process最后返回一串文本(xml或echoStr)。
+
+
+#### 使用场景1：上行URL有效性验证
+
+在微信公众号的后台设置好URL及token等相关信息后，微信会通过GET的方式访问一次该URL，开发者在URL的响应程序里直接调用app.process(params, xml=None)即可返回echStr。
+
+	qs = 'nonce=1221&signature=19selKDJF&timestamp=12312'
+	query = dict([q.split('=') for q in qs.split('&')])
+	app = YourApplication()
+	echo_str = app.process(query, xml=None)
+	# 返回echo_str给微信即可
+	
+
+#### 使用场景2：处理上行消息
+
+用户在微信公众号上发消息给公众号，微信服务器调用上行的URL，开发者需要对每次的的请求进行合法性校验及对消息进行处理，同样的，直接调用app.process方法就好。
+
+	qs = 'nonce=1221&signature=19selKDJF&timestamp=12312'
+	query = dict([q.split('=') for q in qs.split('&')])
+	body = '<xml> ..... </xml>'
+	app = YourApplication()
+	result = app.process(query, xml=body)
+	# 返回result给微信即可
+
+
+### WxApplication子类示例
+
+下面先看看一个WxApplication的示例代码，用于把用户上行的文本返还给用户：
 
 	from wechat.official import WxApplication, WxTextResponse, WxMusic,\
 		WxMusicResponse
@@ -38,18 +78,8 @@ WxApplication内部会实现请求的合法性校验以及消息的分发等功�
     	def on_text(self, text):
         	return WxTextResponse(text.Content, text)
         
-       	def on_image(self, image):
-       		return WxTextResponse(image.Url, image)
-
-	    def on_click(self, click):
-    	    return WxMusicResponse(
-    	    	WxMusic(Title='hey jude',
-    	    			Description='dont make it bad',
-    	    			PicUrl='http://heyjude.com/logo.png',
-    	    			Url='http://heyjude.com/mucis.mp3'), 
-    	    	click)
     	
-需要配置几个类参数，几个参数均可在公众号管理后台的开发者相关页面找到：
+需要配置几个类参数，几个参数均可在公众号管理后台的开发者相关页面找到，前三个参数如果不配置，则需要在调用process方法时传入。
 	
 - SECRET_TOKEN: 微信公众号回调的TOKEN
 - APP_ID: 微信公众号的应用ID
@@ -104,7 +134,7 @@ req是一个代表用户上行消息的WxRequest实例。其属性与消息的XM
 
 #### WxResponse
 
-on_xxx函数需要返回一个WxResponse的子类实例。WxResponse的子类有：
+on_xxx函数需要返回一个WxResponse的子类实例。WxResponse的子类及其构造的方式有：
 
 ##### WxTextResponse, 文本消息
 
@@ -139,18 +169,7 @@ on_xxx函数需要返回一个WxResponse的子类实例。WxResponse的子类有
 	
 	WxEmptyResponse(req)
 
-### 在web中使用WxApplication
-
-编写完成WxApplication后，将其应用于您熟悉的web框架当中即可。关键是在web程序里调用WxApplication的process方法，后续的事情交给SDK来处理。
-
-#### process(params, xml)
-
-WxApplication的process函数，接受两个必须的参数：
-
-- params, url参数字典，需要解析自微信回调的url的querystring。
-- xml, 微信回调时post的xml内容。
-
-process最后返回一串文本(xml或空字符串)。
+### 在Django中使用WxApplication
 
 
 下面以Django为例说明，实现一个微信回调的功能(view)，利用上面示例代码中的WxApp：
@@ -168,7 +187,40 @@ process最后返回一串文本(xml或空字符串)。
     	url(r'^wechat/', 'myapp.views.wechat'),
 	)
 
+
+### 在Flask中使用WxApplication
+	from flask import request
+	from flask import Flask
+	app = Flask(__name__)
+	
+	@app.route('/wechat')
+	def wechat():
+		app = WxApp()
+		return app.process(request.args, request.data)
+
+
 OK.就这么多，WxApplication本身与web框架无关，不管你使用哪个Framework都可以享受到它带来的便利。
+
+### 什么？你不喜欢写WxApplication的子类？！
+
+好吧，其实，你可以在任何地方写on_xxx的响应函数。然后在使用之前，告诉一个WxApplication你要用哪个函数来响应对应的事件就好。以Django为例：
+
+	# 在任何地方写你自己的消息处理函数。
+	# @any_decorator   # 添加任何装饰器。
+	def my_text_handler(req):
+		return WxTextResponse(req.Content, req)
+	
+	# 在web的程序里这样使用：
+	def wechat_view(request):
+		app = WxApplication()   # 实例化基类就好。
+		app.handlers = {'text': my_text_handler}  # 设置你自己的处理器
+		result = app.process(request.GET, request.body, 
+			token='xxxx', app_id='xxxx', aes_key='xxxx')
+		return HttpResponse(result)
+	
+		
+嗯，可以自定义消息的handlers，而如果要针对事件自定义handlers的话，要修改app.event_handlers，数据的格式是一样的。具体的消息和事件类型的key，就直接看看源码得了。卡卡。
+	
 
 ## 3. OAuth API
 

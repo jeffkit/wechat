@@ -2,7 +2,7 @@
 
 from hashlib import sha1
 import requests
-import simplejson as json
+import json
 import tempfile
 import shutil
 import os

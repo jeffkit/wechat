@@ -14,6 +14,7 @@ setup(name="wechat",
       maintainer_email="bbmyth@gmail.com",
       url = url,
       long_description=long_description,
+      install_requires = ['requests'],
       packages=find_packages('.'),
      )
 
