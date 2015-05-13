@@ -451,7 +451,7 @@ class WxApi(object):
                           {'openid': user_id, 'to_groupid': group_id})
 
     def create_menu(self, menus):
-        return self._post('menu/create', menus, ctype='text')
+        return self._post('menu/create', menus)
 
     def get_menu(self):
         return self._get('menu/get')
