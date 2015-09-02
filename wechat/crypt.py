@@ -82,7 +82,9 @@ class XMLParse:
             xml_tree = ET.fromstring(xmltext)
             encrypt = xml_tree.find("Encrypt")
             touser_name = xml_tree.find("ToUserName")
-            return WXBizMsgCrypt_OK, encrypt.text, touser_name.text
+            if touser_name != None:
+                touser_name = touser_name.text
+            return WXBizMsgCrypt_OK, encrypt.text, touser_name
         except Exception:
             return WXBizMsgCrypt_ParseXml_Error, None, None
 
