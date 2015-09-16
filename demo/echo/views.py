@@ -17,4 +17,4 @@ class EchoApp(WxApplication):
 
 def wechat(request):
     echo = EchoApp()
-    return HttpResponse(echo.process(request.GEt, request.body))
+    return HttpResponse(echo.process(request.GET, request.body))
