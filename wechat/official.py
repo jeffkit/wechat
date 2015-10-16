@@ -78,7 +78,7 @@ class WxApplication(object):
         self.pre_process()
         rsp = func(req)
         self.post_process(rsp)
-        result = str(rsp.as_xml())
+        result = rsp.as_xml().encode('UTF-8')
 
         # 加密消息
         if encrypt_type != '' and encrypt_type != 'raw':

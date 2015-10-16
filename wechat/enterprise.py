@@ -60,7 +60,7 @@ class WxApplication(BaseApplication):
         self.pre_process()
         rsp = func(self.req)
         self.post_process()
-        result = str(rsp.as_xml())
+        result = rsp.as_xml().encode('UTF-8') 
 
         if not result:
             return ''
