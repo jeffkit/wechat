@@ -60,7 +60,7 @@ class WxApplication(BaseApplication):
         self.pre_process()
         rsp = func(self.req)
         self.post_process()
-        result = rsp.as_xml()
+        result = str(rsp.as_xml())
 
         if not result:
             return ''
