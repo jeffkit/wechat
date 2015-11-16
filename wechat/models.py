@@ -111,10 +111,10 @@ class WxCompoundResponse(WxResponse):
 
     def __init__(self, data, request):
         super(WxCompoundResponse, self).__init__(request)
-        self.data
+        self.data = data
 
     def content_nodes(self, doc):
-        return self.fields2elements(self.data, self.Tag, doc)
+        return fields2elements(self.data, self.Tag, doc)
 
 
 class WxImageResponse(WxCompoundResponse):
