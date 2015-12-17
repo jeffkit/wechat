@@ -42,12 +42,12 @@ class WxApplication(BaseApplication):
 
         cpt = WXBizMsgCrypt(self.token, self.aes_key, self.corp_id)
 
-        err, echo = cpt.VerifyURL(msg_signature, timestamp, nonce, echostr)
-
-        if err:
-            return 'invalid request'
         if not xml:
-            return echo
+            err, echo = cpt.VerifyURL(msg_signature, timestamp, nonce, echostr)
+            if err:
+                return 'invalid request, code %s' % err
+            else:
+                return echo
 
         err, xml = cpt.DecryptMsg(xml, msg_signature, timestamp, nonce)
         if err:
