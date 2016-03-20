@@ -4,7 +4,7 @@ from django.http import HttpResponse
 from wechat.official import WxApplication, WxTextResponse
 from django.views.decorators.csrf import csrf_exempt
 
-class EchoApp(WxApplication):
+class WxApp(WxApplication):
     """把用户输入的文本原样返回。
     """
 
