@@ -1,2 +1,2 @@
-#encoding=utf-8
-VERSION = "0.4.16"
+# encoding=utf-8
+VERSION = "0.4.17"

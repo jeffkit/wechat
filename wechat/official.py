@@ -410,6 +410,43 @@ class WxApi(WxBaseApi):
     def delete_menu(self):
         return self._get('menu/delete')
 
+    def create_tag(self, tag):
+        return self._post('tags/create', tag)
+
+    def tags(self):
+        return self._get('tags/get')
+
+    def update_tag(self, tag_id,name):
+        return self._post('tags/update',
+                          {'tag': {'id': tag_id, 'name': name}})
+
+    def delete_tag(self, tag_id):
+        return self._post('tags/delete',
+                          {'tag': {'id': tag_id}})
+
+    def tag_of_user(self, user_id):
+        return self._post('tags/getidlist', {'openid': user_id})
+
+    def batch_tagging(self, tag_id, users_list):
+        return self._post('tags/members/batchtagging',
+                          {'openid_list': users_list, 'tagid': tag_id})
+
+    def batch_untagging(self, tag_id,users_list):
+        return self._post('tags/members/batchuntagging',
+                          {'openid_list': users_list, 'tagid': tag_id})
+
+    def get_blacklist(self, user_id=""):
+        return self._post('tags/members/getblacklist',
+                          {'begin_openid': user_id})
+
+    def batch_blacklist(self, users_list):
+        return self._post('tags/members/batchblacklist',
+                          {'opened_list': users_list})
+
+    def batch_unblacklist(self, users_list):
+        return self._post('tags/members/batchunblacklist',
+                          {'opened_list': users_list})
+
     def customservice_records(self, starttime, endtime, openid=None,
                               pagesize=100, pageindex=1):
         return self._get('customservice/getrecord',
