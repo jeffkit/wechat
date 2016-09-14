@@ -410,8 +410,9 @@ class WxApi(WxBaseApi):
     def delete_menu(self):
         return self._get('menu/delete')
 
-    def create_tag(self, tag):
-        return self._post('tags/create', tag)
+    def create_tag(self, name):
+        return self._post('tags/create',
+                          {'tag': {"name":name}})
 
     def tags(self):
         return self._get('tags/get')
@@ -446,6 +447,10 @@ class WxApi(WxBaseApi):
     def batch_unblacklist(self, users_list):
         return self._post('tags/members/batchunblacklist',
                           {'opened_list': users_list})
+
+    def update_user_remark(self, openid, remark):
+        return self._post('user/info/updateremark',
+                          {'openid': openid, 'remark': remark})
 
     def customservice_records(self, starttime, endtime, openid=None,
                               pagesize=100, pageindex=1):
