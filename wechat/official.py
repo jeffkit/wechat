@@ -442,11 +442,11 @@ class WxApi(WxBaseApi):
 
     def batch_blacklist(self, users_list):
         return self._post('tags/members/batchblacklist',
-                          {'opened_list': users_list})
+                          {'openid_list': users_list})
 
     def batch_unblacklist(self, users_list):
         return self._post('tags/members/batchunblacklist',
-                          {'opened_list': users_list})
+                          {'openid_list': users_list})
 
     def update_user_remark(self, openid, remark):
         return self._post('user/info/updateremark',
